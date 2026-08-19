@@ -1,0 +1,24 @@
+{
+  "name": "dsh-opencode-go-rotation",
+  "version": "0.1.5",
+  "description": "OpenCode Go key rotation and active-key usage for DeepSeek Harness",
+  "type": "module",
+  "main": "index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-llm": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-llm-pi-ai": "0.1.0-rc.7",
+    "@earendil-works/pi-ai": "0.82.1"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "inject": ["@deepseek-ai/dsh-client-runtime", "@deepseek-ai/dsh-client-locale", "@deepseek-ai/dsh-client-ui-slots"],
+      "platform": "web"
+    }
+  }
+}
