@@ -2,7 +2,7 @@ import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import { resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
 import { builtinProviders } from '@earendil-works/pi-ai/providers/all'
 import { RotationConfigStore } from './lib/config.mjs'
-import { KeyManager } from './lib/key-manager.mjs'
+import { DEFAULT_COOLDOWN_MS, KeyManager, cooldownMsFromUsage } from './lib/key-manager.mjs'
 import { fetchUsage } from './lib/usage.mjs'
 import { makeRoutes } from './lib/routes.mjs'
 
@@ -50,7 +50,18 @@ export function apply(ctx) {
   const routeDisposers = routes.map((route) => ctx.webServer.register(route))
   const disposeError = ctx.on('agent/request-error', async (payload, next) => {
     if (payload.provider !== PROVIDER || payload.failure.code !== 'QUOTA') return next()
-    const nextKey = await keys.rotateAfterQuota()
+    let cooldownMs = DEFAULT_COOLDOWN_MS
+    const current = await keys.current()
+    if (current) {
+      try {
+        const config = await store.get()
+        const usage = await fetchUsage({ apiKey: current.key, baseUrl: config.baseUrl })
+        cooldownMs = cooldownMsFromUsage(usage)
+      } catch (error) {
+        ctx.logger.warn(`${name}: could not read quota reset time; using ${DEFAULT_COOLDOWN_MS / 3_600_000}h fallback: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+    const nextKey = await keys.rotateAfterQuota({ cooldownMs })
     if (!nextKey) {
       ctx.logger.warn(`${name}: all configured keys are cooling down after quota exhaustion`)
       return next()

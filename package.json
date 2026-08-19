@@ -1,9 +1,12 @@
 {
   "name": "dsh-opencode-go-rotation",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "OpenCode Go key rotation and active-key usage for DeepSeek Harness",
   "type": "module",
   "main": "index.mjs",
+  "scripts": {
+    "test": "node --test"
+  },
   "exports": {
     ".": "./index.mjs",
     "./client": "./client.js",

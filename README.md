@@ -5,7 +5,7 @@ DeepSeek Harness (DSH) plugin for OpenCode Go. It supports multiple API keys, au
 ## Features
 
 - Rotate to the next enabled key after a quota failure.
-- Keep the active key in memory and cool down exhausted keys for six hours.
+- Keep the active key in memory and cool down exhausted keys until their reported quota reset (5 hours is the fallback).
 - Show rolling, weekly, and monthly usage for the active key.
 - Display the active key label without exposing API key material.
 - Configure keys from the DSH usage panel.
@@ -13,7 +13,7 @@ DeepSeek Harness (DSH) plugin for OpenCode Go. It supports multiple API keys, au
 ## Install
 
 ```powershell
-dsh plugin --profile web add https://github.com/erevvv/dsh-opencode-go-rotation.git
+dsh plugin --profile web add https://github.com/hjnvv00v/dsh-opencode-go-rotation.git
 dsh web
 ```
 
