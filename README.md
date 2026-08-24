@@ -1,6 +1,6 @@
 # DSH OpenCode Go Key Rotation
 
-DeepSeek Harness (DSH) plugin for OpenCode Go. It supports multiple API keys, automatic key rotation after quota exhaustion, and active-key usage display.
+DeepSeek Harness (DSH) plugin for OpenCode Go. It supports multiple API keys, automatic key rotation after quota exhaustion, and active-key usage display. It also works when OpenCode Go is configured as a custom DSH provider route.
 
 ## Features
 
@@ -17,7 +17,13 @@ dsh plugin --profile web add https://github.com/hjnvv00v/dsh-opencode-go-rotatio
 dsh web
 ```
 
-After DSH starts, choose provider `opencode-go-rotation` and model `deepseek-v4-flash`, then open the usage panel to add keys.
+After DSH starts, choose provider `opencode-go-rotation` and a model, then open the usage panel to add keys.
+
+## Custom DSH provider
+
+The default source provider is `opencode-go`. If you created OpenCode Go as a custom provider in DSH Settings, enter that provider's **ID** in the `DSH 供应商 ID` field in the usage panel and save.
+
+The custom provider must already declare its `api`, `baseURL`, and at least one model in `llm-pi-ai.providers`; the rotation plugin copies that provider's request settings and only replaces its API key handling. The visible provider used in conversations remains `opencode-go-rotation`.
 
 The plugin stores configuration locally at:
 

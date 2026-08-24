@@ -43,6 +43,7 @@ window.__ModuleLoader__.load({
       const [error, setError] = React.useState()
       const [saving, setSaving] = React.useState(false)
       const [draft, setDraft] = React.useState([])
+      const [sourceProvider, setSourceProvider] = React.useState('opencode-go')
       const draftInitialized = React.useRef(false)
       const previousActiveKey = React.useRef()
       const refreshUsage = React.useCallback(async () => {
@@ -61,6 +62,7 @@ window.__ModuleLoader__.load({
           setState(next)
           if (resetDraft || !draftInitialized.current) {
             setDraft((next.keys || []).map((key) => ({ id: key.id, label: key.label, enabled: key.enabled, masked: key.masked, key: '' })))
+            setSourceProvider(next.sourceProvider || 'opencode-go')
             draftInitialized.current = true
           }
           if (activeChanged) void refreshUsage()
@@ -82,22 +84,24 @@ window.__ModuleLoader__.load({
       const save = async () => {
         setSaving(true); setError(undefined)
         try {
-          await request('/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys: draft.map(({ masked, ...key }) => key) }) })
+          await request('/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sourceProvider, keys: draft.map(({ masked, ...key }) => key) }) })
           await load(true)
         } catch (e) { setError(e.message) } finally { setSaving(false) }
       }
       const active = state || usage?.active
+      const providerName = state?.sourceProviderDisplayName || 'OpenCode Go'
       const summary = usage?.windows?.map((item) => `${({ rolling: '滚动用量', weekly: '每周用量', monthly: '每月用量' })[item.key] || item.key} ${item.percent ?? '?'}%`).join(' · ')
-      const caption = active?.activeKeyLabel ? `OpenCode Go · ${active.activeKeyLabel} · ${summary || '用量加载中'}` : 'OpenCode Go · 未配置 Key'
+      const caption = active?.activeKeyLabel ? `${providerName} · ${active.activeKeyLabel} · ${summary || '用量加载中'}` : `${providerName} · 未配置 Key`
       const update = (index, patch) => setDraft((list) => list.map((entry, item) => item === index ? { ...entry, ...patch } : entry))
       return h('div', { style: css.wrap },
-        h('button', { style: css.badge, title: '查看 OpenCode Go 当前 Key 用量及轮询配置', onClick: () => setExpanded(!expanded) }, caption),
+        h('button', { style: css.badge, title: '查看当前 Key 用量及轮询配置', onClick: () => setExpanded(!expanded) }, caption),
         expanded && h('div', { style: css.card },
-          h('div', { style: css.top }, h('strong', { style: { flex: 1 } }, 'OpenCode Go 当前 Key 用量'), h('button', { style: css.button, onClick: load }, '刷新'), h('button', { style: css.button, onClick: () => setExpanded(false) }, '收起')),
+          h('div', { style: css.top }, h('strong', { style: { flex: 1 } }, `${providerName} 当前 Key 用量`), h('button', { style: css.button, onClick: load }, '刷新'), h('button', { style: css.button, onClick: () => setExpanded(false) }, '收起')),
           active && h('div', null, `当前使用：${active.activeKeyLabel || '无'}，可用 Key ${active.availableKeyCount ?? 0}/${active.keyCount ?? 0}`),
           usage?.windows?.map((item) => h('div', { style: css.row, key: item.key }, h('span', { style: { width: 88, textAlign: 'left' } }, ({ rolling: '滚动用量', weekly: '每周用量', monthly: '每月用量' })[item.key] || item.key), h('div', { style: css.bar }, h('div', { style: { height: '100%', width: `${item.percent ?? 0}%`, background: item.percent >= 90 ? '#d34b4b' : '#3b8c6e' } })), h('span', { style: { width: 42, textAlign: 'right' } }, item.percent === null ? '?' : `${item.percent}%`), h('span', { style: { width: 110, fontSize: 11 } }, remaining(item.resetsInSeconds)))),
           error && h('div', { style: css.error }, error),
           h('div', { style: css.config }, h('strong', null, '轮询 Key'),
+            h('div', { style: css.row }, h('label', { style: { whiteSpace: 'nowrap' } }, 'DSH 供应商 ID'), h('input', { style: css.input, value: sourceProvider, list: 'opencode-go-source-providers', placeholder: '例如 my-opencode-go', onChange: (e) => setSourceProvider(e.target.value) }), h('datalist', { id: 'opencode-go-source-providers' }, (state?.sourceProviders || []).map((provider) => h('option', { key: provider.id, value: provider.id }, provider.displayName === provider.id ? provider.id : `${provider.displayName} (${provider.id})`)))),
             draft.map((entry, index) => h('div', { style: css.row, key: entry.id || index }, h('input', { style: { ...css.input, maxWidth: 115 }, value: entry.label, placeholder: `Key ${index + 1}`, onChange: (e) => update(index, { label: e.target.value }) }), h('input', { style: css.input, value: entry.key, placeholder: entry.masked ? '已保存，留空保持不变' : '粘贴 API Key', type: 'password', onChange: (e) => update(index, { key: e.target.value }) }), h('label', null, h('input', { type: 'checkbox', checked: entry.enabled, onChange: (e) => update(index, { enabled: e.target.checked }) }), '启用'), h('button', { style: css.button, onClick: () => setDraft((list) => list.filter((_, item) => item !== index)) }, '删除'))),
             h('div', { style: css.row }, h('button', { style: css.button, onClick: () => setDraft((list) => [...list, { label: `Key ${list.length + 1}`, enabled: true, key: '' }]) }, '添加 Key'), h('button', { style: css.button, disabled: saving, onClick: save }, saving ? '保存中' : '保存 Key 列表')))
         )

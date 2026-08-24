@@ -1,40 +1,27 @@
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
-import { resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
-import { builtinProviders } from '@earendil-works/pi-ai/providers/all'
 import { RotationConfigStore } from './lib/config.mjs'
 import { DEFAULT_COOLDOWN_MS, KeyManager, cooldownMsFromUsage } from './lib/key-manager.mjs'
 import { fetchUsage } from './lib/usage.mjs'
 import { makeRoutes } from './lib/routes.mjs'
+import { buildRotationProfile, configuredSourceProviders } from './lib/source-provider.mjs'
+import { PLUGIN_NAME, PROVIDER } from './lib/constants.mjs'
 
-export const name = 'opencode-go-rotation'
-export const inject = ['llm', 'webServer']
-export const PROVIDER = 'opencode-go-rotation'
-
-function rotationProfile() {
-  const source = builtinProviders().find((provider) => provider.id === 'opencode-go')
-  if (!source) throw new Error('pi-ai 未提供 opencode-go catalog')
-  const models = source.getModels().map((model) => ({ ...model, provider: PROVIDER }))
-  const piProvider = {
-    ...source,
-    id: PROVIDER,
-    name: 'OpenCode Go (Key rotation)',
-    getModels: () => models,
-  }
-  return {
-    provider: PROVIDER,
-    displayName: 'OpenCode Go (Key rotation)',
-    streamIdleTimeoutMs: 300_000,
-    retryPolicy: resolveRetryPolicy(undefined, `plugin ${name}`),
-    configuredMaxTokens: new Map(),
-    piProvider,
-  }
-}
+export const name = PLUGIN_NAME
+export const inject = ['llm', 'webServer', 'settings']
+export { PROVIDER }
 
 export function apply(ctx) {
   const store = new RotationConfigStore()
   const keys = new KeyManager(store)
-  const profile = rotationProfile()
-  const profiles = new Map([[PROVIDER, profile]])
+  let sourceProvider = store.initial().sourceProvider
+  let profiles = new Map([[PROVIDER, buildRotationProfile(ctx.settings, sourceProvider)]])
+  let adapterRegistration
+  const setSourceProvider = (next) => {
+    const candidate = buildRotationProfile(ctx.settings, next)
+    sourceProvider = next
+    profiles = new Map([[PROVIDER, candidate]])
+    adapterRegistration?.replace([PROVIDER])
+  }
   const adapter = new PiAiAdapter({
     profiles: () => profiles,
     resolveApiKey: async () => {
@@ -45,8 +32,8 @@ export function apply(ctx) {
     resolveAttachments: () => ctx.get('attachments'),
     onReplayDegrade: ({ reason }) => ctx.logger.warn(`${name}: replay degraded: ${reason}`),
   })
-  const adapterRegistration = ctx.llm.registerAdapter([PROVIDER], adapter)
-  const routes = makeRoutes({ store, keys, usage: fetchUsage })
+  adapterRegistration = ctx.llm.registerAdapter([PROVIDER], adapter)
+  const routes = makeRoutes({ store, keys, usage: fetchUsage, configuredSources: () => configuredSourceProviders(ctx.settings), setSourceProvider })
   const routeDisposers = routes.map((route) => ctx.webServer.register(route))
   const disposeError = ctx.on('agent/request-error', async (payload, next) => {
     if (payload.provider !== PROVIDER || payload.failure.code !== 'QUOTA') return next()
